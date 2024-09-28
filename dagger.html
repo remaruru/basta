@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>londry</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Added for mobile view -->
+    <title>pronhub</title>
     <style>
         body, html {
             font-family: 'Arial', sans-serif;
@@ -14,13 +13,17 @@
             margin: 0;
         }
         .pos-container {
-            width: 100%;
-            max-width: 900px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
-            padding: 20px;
-        }
+    width: 90%;
+    max-width: 900px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    padding: 20px;
+    height: 110vh; 
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
         .header {
             text-align: center;
             margin-bottom: 20px;
@@ -31,9 +34,14 @@
         }
         .form-group {
             margin-bottom: 15px;
+            width: 99%;
         }
         label {
             font-weight: bold;
+        }
+        #loadContainer {
+            height: 600px; 
+            overflow-y: auto; /* Ensure scrolling when content overflows */
         }
         .load-section {
             border: 1px solid #ddd;
@@ -77,10 +85,14 @@
             background-color: #28a745 !important;
             color: white;
         }
+        .disabled {
+            background-color: #ccc !important;
+            cursor: not-allowed;
+        }
         select, input {
             padding: 10px;
             border-radius: 5px;
-            width: 100%;
+            width: 90%;
             margin-top: 5px;
         }
         .add-load-btn {
@@ -122,33 +134,41 @@
         .total-section label {
             font-size: 18px;
         }
-
-        /* Mobile responsive adjustments */
-        @media (max-width: 768px) {
-            .pos-container {
-                padding: 10px;
-                width: 100%;
-            }
-            .service-group, .additional-group {
-                flex-direction: column;
-                align-items: center;
-            }
-            .service, .additional {
-                margin: 10px 0;
-            }
+        .summary-section {
+    background: #f9f9f9;
+    border-radius: 5px;
+    padding: 15px;
+    margin-top: 20px;
+    max-height: 900px; 
+    overflow-y: auto;
+}
+        .summary-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+        .summary-item label {
+            font-size: 14px;
+            color: #333;
         }
     </style>
 </head>
 <body>
     <div class="pos-container">
         <div class="header">
-            <h2>londry</h2>
+            <h2>niggang naka crocs</h2>
         </div>
 
         <!-- Received By Section -->
         <div class="form-group">
             <label>Received By</label>
-            <input type="text" id="receivedBy">
+            <select id="receivedBy">
+                <option value="Person 1">jhessa</option>
+                <option value="Person 2">argie</option>
+                <option value="Person 3">lourdes</option>
+                <option value="Person 4">saltik-sintosinto-abduljabar</option>
+                <option value="Person 5">troy</option>
+            </select>
         </div>
 
         <!-- Customer Details Section -->
@@ -183,7 +203,6 @@
                     <label>Additional Services</label>
                     <div class="additional-group">
                         <div class="additional" data-service="Spin" data-price="20">Spin</div>
-                        <div class="additional" data-service="Rinse" data-price="20">Rinse</div>
                         <div class="additional" data-service="Rinse & Spin" data-price="30">Rinse & Spin</div>
                         <div class="additional" data-service="Extend Dry" data-price="10">Extend Dry</div>
                         <div class="additional" data-service="Fold" data-price="30">Fold</div>
@@ -195,6 +214,12 @@
 
         <!-- Add Load Button -->
         <button class="add-load-btn" id="addLoadBtn">Add Load +</button>
+
+        <!-- Summary Section -->
+        <div class="summary-section" id="summarySection">
+            <h4>Summary of Services</h4>
+            <div id="summaryContent"></div>
+        </div>
 
         <!-- Total Price and Payment Section -->
         <div class="total-section">
@@ -245,10 +270,10 @@
                 </div>
             `;
             loadContainer.appendChild(newLoad);
-            bindServiceListeners(); // Rebind event listeners for the new load section
+            bindServiceListeners();
         }
 
-        // Function to remove a specific load section
+        // Function to remove a load section
         function removeLoad(loadId) {
             const loadToRemove = document.getElementById(`load-${loadId}`);
             loadToRemove.remove();
@@ -258,60 +283,132 @@
         // Function to handle service and additional selection
         function bindServiceListeners() {
             document.querySelectorAll('.service').forEach(serviceBtn => {
-                serviceBtn.onclick = function () {
-                    const parent = this.closest('.service-group');
-                    parent.querySelectorAll('.service').forEach(btn => btn.classList.remove('selected'));
-                    this.classList.add('selected');
+                serviceBtn.addEventListener('click', () => {
+                    const loadSection = serviceBtn.closest('.load-section');
+                    loadSection.querySelectorAll('.service').forEach(btn => btn.classList.remove('selected'));
+                    serviceBtn.classList.add('selected');
+                    handleAdditionalServices(serviceBtn);  // Handle additional services based on selected service
                     calculateTotal();
-                };
+                });
             });
 
             document.querySelectorAll('.additional').forEach(additionalBtn => {
-                additionalBtn.onclick = function () {
-                    const isRinseAndSpin = this.dataset.service === 'Rinse & Spin';
-                    const rinseElement = this.closest('.additional-group').querySelector('[data-service="Rinse"]');
+                additionalBtn.addEventListener('click', () => {
+                    // If the button is disabled, don't allow it to be toggled
+                    if (additionalBtn.classList.contains('disabled')) return;
 
-                    if (isRinseAndSpin && rinseElement) {
-                        rinseElement.classList.remove('selected'); // Deselect Rinse when Rinse & Spin is selected
+                    const loadSection = additionalBtn.closest('.load-section');
+                    const selectedService = loadSection.querySelector('.service.selected');
+
+                    // If "Spin" is pressed, disable "Rinse & Spin", and vice versa
+                    if (additionalBtn.dataset.service === "Spin") {
+                        const rinseSpinBtn = loadSection.querySelector('.additional[data-service="Rinse & Spin"]');
+                        if (additionalBtn.classList.contains('selected')) {
+                            rinseSpinBtn.classList.remove('disabled');
+                        } else {
+                            rinseSpinBtn.classList.add('disabled');
+                            rinseSpinBtn.classList.remove('selected');
+                        }
+                    } else if (additionalBtn.dataset.service === "Rinse & Spin") {
+                        const spinBtn = loadSection.querySelector('.additional[data-service="Spin"]');
+                        if (additionalBtn.classList.contains('selected')) {
+                            spinBtn.classList.remove('disabled');
+                        } else {
+                            spinBtn.classList.add('disabled');
+                            spinBtn.classList.remove('selected');
+                        }
                     }
 
-                    this.classList.toggle('selected');
+                    additionalBtn.classList.toggle('selected');
                     calculateTotal();
-                };
+                });
             });
         }
 
-        // Function to calculate total price based on selections
+        // Handle additional services when a specific service is selected
+        function handleAdditionalServices(serviceBtn) {
+            const loadSection = serviceBtn.closest('.load-section');
+            const additionalBtns = loadSection.querySelectorAll('.additional');
+            const service = serviceBtn.dataset.service;
+
+            // Reset additional services
+            additionalBtns.forEach(btn => {
+                btn.classList.remove('selected');
+                btn.classList.remove('disabled');
+            });
+
+            // If "Washing" or "Drying" is selected, select only "Spin"
+            if (["Washing", "Drying"].includes(service)) {
+                const spinBtn = loadSection.querySelector('.additional[data-service="Spin"]');
+                spinBtn.classList.add('selected');
+                const rinseSpinBtn = loadSection.querySelector('.additional[data-service="Rinse & Spin"]');
+                rinseSpinBtn.classList.add('disabled');
+                rinseSpinBtn.classList.remove('selected');
+            }
+
+            // If "Wash & Dry + Fold", "Full Service", or "Premium" is selected, disable "Spin" and "Rinse & Spin"
+            if (["Wash & Dry + Fold", "Full Service", "Premium"].includes(service)) {
+                const spinBtn = loadSection.querySelector('.additional[data-service="Spin"]');
+                const rinseSpinBtn = loadSection.querySelector('.additional[data-service="Rinse & Spin"]');
+                spinBtn.classList.add('disabled');
+                rinseSpinBtn.classList.add('disabled');
+            }
+        }
+
+        // Function to calculate total price and update summary
         function calculateTotal() {
             let total = 0;
+            const summaryContent = document.getElementById('summaryContent');
+            summaryContent.innerHTML = '';  // Clear previous summary
 
-            document.querySelectorAll('.service.selected').forEach(service => {
-                total += parseInt(service.dataset.price);
+            // Calculate service price and create summary
+            document.querySelectorAll('.load-section').forEach(loadSection => {
+                const selectedService = loadSection.querySelector('.service.selected');
+                const selectedAdditionals = loadSection.querySelectorAll('.additional.selected');
+                const loadTitle = loadSection.querySelector('h4').innerText;
+
+                if (selectedService) {
+                    const servicePrice = parseFloat(selectedService.dataset.price);
+                    total += servicePrice;
+                    let summaryItem = `<div class="summary-item"><label>${loadTitle} - ${selectedService.innerText}</label><label>${servicePrice} Pesos</label></div>`;
+                    
+                    // Append additional services to summary
+                    selectedAdditionals.forEach(additional => {
+                        const additionalPrice = parseFloat(additional.dataset.price);
+                        total += additionalPrice;
+                        summaryItem += `<div class="summary-item"><label>+ ${additional.innerText}</label><label>${additionalPrice} Pesos</label></div>`;
+                    });
+
+                    summaryContent.innerHTML += summaryItem;
+                }
             });
 
-            document.querySelectorAll('.additional.selected').forEach(additional => {
-                total += parseInt(additional.dataset.price);
-            });
-
+            // Update total price
             document.getElementById('totalPrice').innerText = total;
-
-            const paymentReceived = parseInt(document.getElementById('paymentReceived').value) || 0;
-            document.getElementById('change').innerText = paymentReceived - total;
+            calculateChange();  // Recalculate change whenever total is updated
         }
 
-        // Rebind listeners for initial load
+        // Function to calculate change
+        function calculateChange() {
+            const payment = parseFloat(document.getElementById('paymentReceived').value) || 0;
+            const total = parseFloat(document.getElementById('totalPrice').innerText);
+            document.getElementById('change').innerText = payment - total;
+        }
+
+        // Function to submit the order
+        function submitOrder() {
+            alert('wala pa nga e pindot ka ng pindot');
+            // Add your order submission logic here (e.g., sending data to a server)
+        }
+
+        // Initial binding of service listeners
         bindServiceListeners();
 
-        // Add new load event listener
+        // Add event listener for the add load button
         document.getElementById('addLoadBtn').addEventListener('click', addLoad);
 
-        // Payment Received Change Event
-        document.getElementById('paymentReceived').addEventListener('input', calculateTotal);
-
-        // Placeholder function for submission
-        function submitOrder() {
-            alert('Order Submitted');
-        }
+        // Add event listener for payment received input
+        document.getElementById('paymentReceived').addEventListener('input', calculateChange);
     </script>
 </body>
 </html>
